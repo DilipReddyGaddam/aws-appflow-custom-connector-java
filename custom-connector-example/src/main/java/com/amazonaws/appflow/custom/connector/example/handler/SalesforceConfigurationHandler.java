@@ -66,14 +66,17 @@ public class SalesforceConfigurationHandler extends AbstractSalesforceHandler im
 
     @Override
     public ValidateCredentialsResponse validateCredentials(final ValidateCredentialsRequest request) {
+
         String requestUri = buildSalesforceUserInfoRequest(request);
+
         ConnectorContext connectorContext = ImmutableConnectorContext.builder()
                 .apiVersion(request.connectorRuntimeSettings().get(API_VERSION))
                 .credentials(request.credentials())
                 .connectorRuntimeSettings(request.connectorRuntimeSettings())
                 .build();
 
-        final SalesforceResponse response = getSalesforceClient(connectorContext).restGet(requestUri);
+        final SalesforceResponse response =
+                getSalesforceClient(connectorContext).restGet(requestUri);
 
         ErrorDetails errorDetails = checkForErrorsInSalesforceResponse(response);
         if (Objects.nonNull(errorDetails)) {
