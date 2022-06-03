@@ -24,11 +24,8 @@
 
 package com.amazonaws.appflow.custom.connector.example.handler;
 
-import com.amazonaws.appflow.custom.connector.example.SalesforceResponse;
 import com.amazonaws.appflow.custom.connector.example.configuration.SalesforceConnectorConfiguration;
 import com.amazonaws.appflow.custom.connector.handlers.ConfigurationHandler;
-import com.amazonaws.appflow.custom.connector.model.ConnectorContext;
-import com.amazonaws.appflow.custom.connector.model.ErrorDetails;
 import com.amazonaws.appflow.custom.connector.model.ImmutableConnectorContext;
 import com.amazonaws.appflow.custom.connector.model.connectorconfiguration.DescribeConnectorConfigurationRequest;
 import com.amazonaws.appflow.custom.connector.model.connectorconfiguration.DescribeConnectorConfigurationResponse;
@@ -36,24 +33,21 @@ import com.amazonaws.appflow.custom.connector.model.connectorconfiguration.Immut
 import com.amazonaws.appflow.custom.connector.model.credentials.ImmutableValidateCredentialsResponse;
 import com.amazonaws.appflow.custom.connector.model.credentials.ValidateCredentialsRequest;
 import com.amazonaws.appflow.custom.connector.model.credentials.ValidateCredentialsResponse;
+import com.amazonaws.appflow.custom.connector.model.metadata.ImmutableListEntitiesRequest;
+import com.amazonaws.appflow.custom.connector.model.metadata.ListEntitiesRequest;
+import com.amazonaws.appflow.custom.connector.model.metadata.ListEntitiesResponse;
 import com.amazonaws.appflow.custom.connector.model.settings.ImmutableValidateConnectorRuntimeSettingsResponse;
 import com.amazonaws.appflow.custom.connector.model.settings.ValidateConnectorRuntimeSettingsRequest;
 import com.amazonaws.appflow.custom.connector.model.settings.ValidateConnectorRuntimeSettingsResponse;
 
-import java.util.Map;
 import java.util.Objects;
 
 import static com.amazonaws.appflow.custom.connector.example.configuration.ConnectorSettingKey.API_VERSION;
-import static com.amazonaws.appflow.custom.connector.example.configuration.ConnectorSettingKey.IS_SANDBOX_ACCOUNT;
 
 /**
  * Salesforce Configuration handler.
  */
-public class SalesforceConfigurationHandler extends AbstractSalesforceHandler implements ConfigurationHandler {
-
-    public static final String SALESFORCE_USERINFO_URL_FORMAT = "https://login.salesforce.com/services/oauth2/userinfo";
-    public static final String SALESFORCE_USERINFO_SANDBOX_URL_FORMAT = "https://test.salesforce.com/services/oauth2/userinfo";
-    public static final String TRUE = "TRUE";
+public class SalesforceConfigurationHandler implements ConfigurationHandler {
 
     private static final String CONNECTOR_OWNER = "SampleConnector";
     private static final String CONNECTOR_NAME = "SampleSalesforceConnector";
@@ -66,20 +60,18 @@ public class SalesforceConfigurationHandler extends AbstractSalesforceHandler im
 
     @Override
     public ValidateCredentialsResponse validateCredentials(final ValidateCredentialsRequest request) {
-        String requestUri = buildSalesforceUserInfoRequest(request);
-        ConnectorContext connectorContext = ImmutableConnectorContext.builder()
-                .apiVersion(request.connectorRuntimeSettings().get(API_VERSION))
-                .credentials(request.credentials())
-                .connectorRuntimeSettings(request.connectorRuntimeSettings())
+        final ListEntitiesRequest listEntitiesRequest = ImmutableListEntitiesRequest.builder()
+                .connectorContext(ImmutableConnectorContext.builder()
+                        .apiVersion((String) request.connectorRuntimeSettings().get(API_VERSION))
+                        .credentials(request.credentials())
+                        .connectorRuntimeSettings(request.connectorRuntimeSettings())
+                        .build())
                 .build();
-
-        final SalesforceResponse response = getSalesforceClient(connectorContext).restGet(requestUri);
-
-        ErrorDetails errorDetails = checkForErrorsInSalesforceResponse(response);
-        if (Objects.nonNull(errorDetails)) {
+        final ListEntitiesResponse response = new SalesforceMetadataHandler().listEntities(listEntitiesRequest);
+        if (Objects.nonNull(response.errorDetails())) {
             return ImmutableValidateCredentialsResponse.builder()
                     .isSuccess(false)
-                    .errorDetails(errorDetails)
+                    .errorDetails(response.errorDetails())
                     .build();
         } else {
             return ImmutableValidateCredentialsResponse.builder().isSuccess(true).build();
@@ -99,18 +91,5 @@ public class SalesforceConfigurationHandler extends AbstractSalesforceHandler im
                 .supportedApiVersions(SalesforceConnectorConfiguration.getSupportedApiVersions())
                 .supportedWriteOperations(SalesforceConnectorConfiguration.supportedWriteOperations())
                 .build();
-    }
-
-    private String buildSalesforceUserInfoRequest(final ValidateCredentialsRequest request) {
-        Map<String, String> connectorRuntimeSettings = request.connectorRuntimeSettings();
-
-        if (Objects.isNull(connectorRuntimeSettings)) {
-            return SALESFORCE_USERINFO_URL_FORMAT;
-        }
-        if (connectorRuntimeSettings.containsKey(IS_SANDBOX_ACCOUNT) &&
-                TRUE.equalsIgnoreCase(connectorRuntimeSettings.get(IS_SANDBOX_ACCOUNT))) {
-            return SALESFORCE_USERINFO_SANDBOX_URL_FORMAT;
-        }
-        return SALESFORCE_USERINFO_URL_FORMAT;
     }
 }
